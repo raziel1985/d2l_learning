@@ -66,9 +66,11 @@ print(f'w的估计误差: {true_w - w.reshape(true_w.shape)}')
 print(f'b的估计误差: {true_b - b}')
 
 
+####################################################
 # 简略代码
 # 通过features, labels，计算w, b
 # features和labels，由true_w, true_b模拟生成
+####################################################
 true_w = torch.tensor([2, -3.4])
 true_b = 4.2
 features, labels = synthetic_data(true_w, true_b, 1000)
