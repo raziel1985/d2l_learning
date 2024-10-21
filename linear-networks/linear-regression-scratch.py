@@ -53,7 +53,6 @@ loss = squared_loss
 
 for epoch in range(num_epochs):
     for X, y in data_iter(batch_size, features, labels):
-        # 方法一
         l = loss(net(X, w, b), y)
         l.sum().backward()
         sgd([w, b], lr, batch_size)
