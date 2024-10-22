@@ -21,6 +21,7 @@ def accuracy(y_hat, y):
 
 def value_accuracy(net, data_iter):
     metric = Accumulator(2)
+    net.eval()
     with torch.no_grad():
         for X, y in data_iter:
             metric.add(accuracy(net(X), y), y.numel())
@@ -30,12 +31,13 @@ def train(net, train_iter, test_iter, cross_entropy, num_epochs, updater):
     animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],
                         legend=['train loss', 'train acc', 'test acc'], figsize=(7, 5))
     for epoch in range(num_epochs):
+        net.train()
         metric = Accumulator(3)
         for X, y in train_iter:
             y_hat = net(X)
             loss = cross_entropy(y_hat, y)
             updater.zero_grad()
-            loss.backward()
+            loss.mean().backward()
             updater.step()
             metric.add(loss * len(y), accuracy(y_hat, y), y.numel())
         train_metric = metric[0] / metric[2], metric[1] / metric[2]
