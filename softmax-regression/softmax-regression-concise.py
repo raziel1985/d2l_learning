@@ -5,6 +5,8 @@ from d2l import torch as d2l
 from d2l.torch import Accumulator, Animator
 
 batch_size = 256
+# TODO(rogerluo): 下面的代码在DataLoader设置num_workers参数后，pycharm内调试运行时会报错，
+#  应该该和本地运行的worker生命周期有关系，但是在使用Animator绘图代码后，下面的代码可以正常运行
 train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
 
 net = nn.Sequential(nn.Flatten(), nn.Linear(784, 10))
@@ -27,7 +29,7 @@ def value_accuracy(net, data_iter):
             metric.add(accuracy(net(X), y), y.numel())
     return metric[0] / metric[1]
 
-def train(net, train_iter, test_iter, cross_entropy, num_epochs, updater):
+def train(net, train_iter, test_iter, loss, num_epochs, updater):
     animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],
                         legend=['train loss', 'train acc', 'test acc'], figsize=(7, 5))
     for epoch in range(num_epochs):
@@ -35,11 +37,13 @@ def train(net, train_iter, test_iter, cross_entropy, num_epochs, updater):
         metric = Accumulator(3)
         for X, y in train_iter:
             y_hat = net(X)
-            loss = cross_entropy(y_hat, y)
+            l = loss(y_hat, y)
             updater.zero_grad()
-            loss.mean().backward()
+            l.mean().backward()
             updater.step()
-            metric.add(loss * len(y), accuracy(y_hat, y), y.numel())
+            # TODO（rogerluo): 在使用 torch.optim.Optimizer 时，l.sum()输出数值和l.mean()一样
+            #  导致记录下的train loss过小，原因不明。故用l.mean() * y.numel() 代替 l.sum() 用来记录展示
+            metric.add(l.mean() * y.numel(), accuracy(y_hat, y), y.numel())
         train_metric = metric[0] / metric[2], metric[1] / metric[2]
         test_acc = value_accuracy(net, test_iter)
         animator.add(epoch + 1, train_metric + (test_acc,))
