@@ -1,0 +1,13 @@
+# Python编译相关
+__pycache__/
+*.pyc
+**/*.pyc
+
+# 虚拟环境
+/.venv/
+
+# IDE相关
+/.idea/
+
+# 数据文件
+/data/
