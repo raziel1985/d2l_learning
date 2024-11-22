@@ -1,5 +1,3 @@
-from torchvision.transforms.v2.functional import resize
-
 import common
 import torch
 from torch import nn
