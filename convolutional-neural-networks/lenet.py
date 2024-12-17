@@ -28,5 +28,5 @@ batch_size = 256
 train_iter, test_iter = common.load_data_fashion_mnist(batch_size=batch_size)
 
 lr, num_epochs = 0.9, 10
-common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu())
+common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu_or_mps())
 plt.show()

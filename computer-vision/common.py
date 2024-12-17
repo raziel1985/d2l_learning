@@ -21,8 +21,18 @@ def try_gpu(i=0):
         return gpu(i)
     return cpu()
 
+def try_gpu_or_mps(i=0):
+    if torch.cuda.device_count() == 0 and torch.backends.mps.is_available():
+        return torch.device('mps')
+    return try_gpu(i)
+
 def try_all_gpus():
     return [gpu(i) for i in range(num_gpus())]
+
+def try_all_gpus_or_mps():
+    if torch.cuda.device_count() == 0 and torch.backends.mps.is_available():
+        return [torch.device('mps')]
+    return try_all_gpus()
 
 class Residual(nn.Module):
     def __init__(self, input_channels, num_channels,

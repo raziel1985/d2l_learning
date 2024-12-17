@@ -61,9 +61,8 @@ train_iter, test_iter = d2l.load_data_voc(batch_size, crop_size)
 def loss(inputs, targets):
     return F.cross_entropy(inputs, targets, reduction='none').mean(1).mean(1)
 
-num_epochs, lr, wd, devices = 5, 0.001, 1e-3, common.try_all_gpus()
+num_epochs, lr, wd, devices = 5, 0.001, 1e-3, common.try_all_gpus_or_mps()
 trainer = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=wd)
-# TODO(rogerluo): acc计算不正确
 common.train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs, devices, print_all_log=True)
 
 # 预测

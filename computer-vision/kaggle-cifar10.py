@@ -115,7 +115,7 @@ def train(net, train_iter, valid_iter, loss, num_epochs, lr, wd, devices, lr_per
     animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs], legend=legend)
     if len(devices) != 0:
         # 启用多GPU训练模式
-        net = nn.DataParallel(net, devices_ids = devices).to(devices[0])
+        net = nn.DataParallel(net, device_ids = devices).to(devices[0])
     for epoch in range(num_epochs):
         net.train()
         metric = d2l.Accumulator(3)
@@ -139,7 +139,7 @@ def train(net, train_iter, valid_iter, loss, num_epochs, lr, wd, devices, lr_per
         scheduler.step()
 
 # 训练和验证模型
-devices, num_epochs, lr, wd = common.try_all_gpus(), 20, 2e-4, 5e-4
+devices, num_epochs, lr, wd = common.try_all_gpus_or_mps(), 20, 2e-4, 5e-4
 lr_period, lr_decay= 4, 0.9
 net = get_net()
 print(net)
@@ -149,7 +149,6 @@ for layer in net:
     print(layer.__class__, 'output shape: \t', X.shape)
 loss = nn.CrossEntropyLoss(reduction="none")
 
-# TODO(rogerluo): 使用GPU进行测试
 train(net, train_iter, valid_iter, loss, num_epochs, lr, wd, devices, lr_period, lr_decay)
 plt.show()
 

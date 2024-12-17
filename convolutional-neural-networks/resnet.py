@@ -64,4 +64,4 @@ for layer in net:
 
 lr, num_epochs, batch_size = 0.05, 10, 256
 train_iter, test_iter = common.load_data_fashion_mnist(batch_size, resize=96)
-common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu(), print_all_log=True)
+common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu_or_mps(), print_all_log=True)

@@ -146,7 +146,7 @@ print('output bbox preds:', bbox_preds.shape)
 # 读取数据集和初始化
 batch_size = 32
 train_iter, _ = d2l.load_data_bananas(batch_size)
-device, net = common.try_gpu(), TinySSD(num_classes=1)
+device, net = common.try_gpu_or_mps(), TinySSD(num_classes=1)
 trainer = torch.optim.SGD(net.parameters(), lr=0.2, weight_decay=5e-4)
 
 # 定义损失函数和评价函数

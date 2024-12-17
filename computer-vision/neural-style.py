@@ -127,7 +127,7 @@ def train(X, contents_Y, styles_Y, device, lr, num_epochs, lr_decay_epoch):
             plt.show()
     return img
 
-device, image_shape = common.try_gpu(), (300, 450)
+device, image_shape = common.try_gpu_or_mps(), (300, 450)
 net = net.to(device)
 content_X, contents_Y = get_content(image_shape, device)
 print(content_X.shape, contents_Y.shape)
