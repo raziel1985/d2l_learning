@@ -30,5 +30,5 @@ for layer in net:
 lr, num_epochs, batch_size = 0.1, 10, 128
 train_iter, test_iter = common.load_data_fashion_mnist(batch_size, resize=224)
 # TODO（rogerluo): < 1 epoch下，train acc一直在10%左右。网络过大参数训练不足，需要使用GPU训练验证
-common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu(), print_all_log=True)
+common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu_or_mps(), print_all_log=True)
 plt.show()

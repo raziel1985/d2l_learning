@@ -82,7 +82,7 @@ def get_net(devices):
 # 定义训练函数
 def train(net, train_iter, valid_iter, loss, num_epochs, lr, wd, devices, lr_period, lr_decay):
     if len(devices) > 0:
-        net = nn.DataParallel(net, devices_ids=devices).to(devices[0])
+        net = nn.DataParallel(net, device_ids=devices).to(devices[0])
     trainer = torch.optim.SGD((param for param in net.parameters() if param.requires_grad),
                               lr=lr, momentum=0.9, weight_decay=wd)
     scheduler = torch.optim.lr_scheduler.StepLR(trainer, lr_period, lr_decay)
@@ -115,10 +115,12 @@ def train(net, train_iter, valid_iter, loss, num_epochs, lr, wd, devices, lr_per
 
 
 # 训练和验证模型
-devices = common.try_all_gpus()
+devices = common.try_all_gpus_or_mps()
 net = get_net(devices)
 print(net)
 X = torch.rand(size=(1, 3, 224, 224), dtype=torch.float32)
+if len(devices) > 0:
+    X = X.to(devices[0])
 for layer in net:
     X = layer(X)
     print(layer.__class__, 'output shape: \t', X.shape)

@@ -43,5 +43,5 @@ net = vgg(small_conv_arch)
 
 lr, num_epochs, batch_size = 0.05, 10, 128
 train_iter, test_iter = common.load_data_fashion_mnist(batch_size, resize=224)
-common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu(), print_all_log=True)
+common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu_or_mps(), print_all_log=True)
 plt.show()

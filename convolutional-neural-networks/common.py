@@ -9,6 +9,11 @@ def try_gpu(i=0):
         return torch.device(f'cuda:{i}')
     return torch.device('cpu')
 
+def try_gpu_or_mps(i=0):
+    if torch.cuda.device_count() == 0 and torch.backends.mps.is_available():
+        return torch.device('mps')
+    return try_gpu(i)
+
 def load_data_fashion_mnist(batch_size, resize=None):
     """Download the Fashion-MNIST dataset and then load it into memory."""
     trans = [transforms.ToTensor()]

@@ -35,5 +35,5 @@ batch_size = 128
 train_iter, test_iter = common.load_data_fashion_mnist(batch_size, resize=224)
 
 lr, num_epochs = 0.01, 10
-common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu())
+common.train_ch6(net, train_iter, test_iter, num_epochs, lr, common.try_gpu_or_mps(), print_all_log=True)
 plt.show()

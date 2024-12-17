@@ -70,7 +70,7 @@ net.apply(init_weights)
 
 # 训练
 batch_size = 256
-devices = common.try_all_gpus()
+devices = common.try_all_gpus_or_mps()
 def train_with_data_aug(train_augs, test_augs, net, lr=0.001):
     train_iter = load_cifar10(True, train_augs, batch_size)
     test_iter = load_cifar10(False, test_augs, batch_size)
@@ -78,6 +78,5 @@ def train_with_data_aug(train_augs, test_augs, net, lr=0.001):
     trainer = torch.optim.Adam(net.parameters(), lr=lr)
     common.train_ch13(net, train_iter, test_iter, loss, trainer, 10, devices, print_all_log=True)
 
-# TODO(rogerluo): 使用GPU进行测试
 train_with_data_aug(train_augs, test_augs, net)
 plt.show()

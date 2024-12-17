@@ -48,7 +48,7 @@ def train_fine_tuning(net, learning_rate, batch_size=128, num_epochs=5, param_gr
     test_iter = torch.utils.data.DataLoader(
         torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), transform=test_augs),
         batch_size=batch_size)
-    devices = common.try_all_gpus()
+    devices = common.try_all_gpus_or_mps()
     loss = nn.CrossEntropyLoss(reduction="none")
     if param_group:
         params_1x = [param for name, param in net.named_parameters()
