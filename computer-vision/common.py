@@ -130,7 +130,7 @@ def train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs, devices=tr
                 animator.add(epoch + (i + 1) / num_batches,
                              (metric[0] / metric[2], metric[1] / metric[3], None))
                 print(f'epoch:{epoch + (i + 1) / num_batches:.3f}, train loss:{metric[0] / metric[2]:.3f}, '
-                      f'train acc:{metric[1] / metric[2]:.3f}')
+                      f'train acc:{metric[1] / metric[3]:.3f}')
             if print_all_log:
                 print(epoch + (i + 1) / num_batches, l / labels.shape[0], acc / labels.numel())
         test_acc = evaluate_accuracy_gpu(net, test_iter)
@@ -315,6 +315,11 @@ def nms(boxes, scores, iou_threshold):
     依据设定的交并比阈值筛选掉那些与高置信度框重叠度过高的低置信度框"""
     # boxes: (num_boxes, 4)
     # scores: (num_boxes)
+    original_device = boxes.device
+    # nms计算在某些gpu(比如mps上）特别慢，拷贝到cpu上进行运算
+    if (original_device != torch.device("cpu")):
+        boxes = boxes.to('cpu')
+        scores = scores.to('cpu')
     B = torch.argsort(scores, dim=-1, descending=True)
     keep = []
     while B.numel() > 0:
@@ -324,7 +329,7 @@ def nms(boxes, scores, iou_threshold):
         iou = box_iou(boxes[i, :].reshape(-1, 4), boxes[B[1:], :].reshape(-1, 4)).reshape(-1)
         inds = torch.nonzero(iou <= iou_threshold). reshape(-1) # 保留交并比小于等于阈值的框对应的索引（去除重叠度高的）
         B = B[inds + 1] # inds + 1 是因为前面在计算交并比时去掉了当前置信度最高的框（索引为 0）
-    return torch.tensor(keep, device=boxes.device)
+    return torch.tensor(keep, device=original_device)
 
 def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.5, pos_threshold=0.009999999):
     """使用非极大值抑制来预测边界框
