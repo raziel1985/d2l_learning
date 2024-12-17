@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-from ipykernel.kernelapp import kernel_aliases
 
 import common
 import torch
