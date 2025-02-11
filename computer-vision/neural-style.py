@@ -23,7 +23,7 @@ def preprocess(img, image_shape):
         torchvision.transforms.Resize(image_shape),
         torchvision.transforms.ToTensor(),
         torchvision.transforms.Normalize(mean=rgb_mean, std=rgb_std)])
-    return transforms
+    return transforms(img).unsqueeze(0)
 
 def postprocess(img):
     img = img[0].to(rgb_std.device)
@@ -31,7 +31,9 @@ def postprocess(img):
     return torchvision.transforms.ToPILImage()(img.permute(2, 0, 1))
 
 # 抽取图像特征
-# TODO(rogerluo): 预训练模型下载失败
+# 临时忽略 SSL 验证，下载vgg19预训练模型（不推荐用于生产环境）
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 pretrained_net = torchvision.models.vgg19(pretrained=True)
 # TODO(rogerluo): 为什么内容只取一层，而样式取这么多层。是因为初始图就是内容图片吗？
 style_layers, content_layers = [0, 5, 10, 19, 28], [25]
@@ -49,12 +51,12 @@ def extract_features(X, content_layers, style_layers):
             contents.append(X)
     return contents, styles
 
-def get_content(image_shape, device):
+def get_contents(image_shape, device):
     content_X = preprocess(content_img, image_shape).to(device)
     contents_Y, _ = extract_features(content_X, content_layers, style_layers)
     return content_X, contents_Y
 
-def get_style(image_shape, device):
+def get_styles(image_shape, device):
     style_X = preprocess(style_img, image_shape).to(device)
     _, styles_Y = extract_features(style_X, content_layers, style_layers)
     return style_X, styles_Y
@@ -114,6 +116,7 @@ def train(X, contents_Y, styles_Y, device, lr, num_epochs, lr_decay_epoch):
     styles_Y_gram = [gram(Y) for Y in styles_Y]
     for epoch in range(num_epochs):
         trainer.zero_grad()
+        # 计算img各个层的参数，通过减少和目标参数(content_layers, style_layers)的loss，来更新img
         contents_Y_hat, styles_Y_hat = extract_features(img, content_layers, style_layers)
         contents_l, styles_l, tv_l, l = compute_loss(img, contents_Y_hat, styles_Y_hat,
                                                      contents_Y, styles_Y_gram)
@@ -124,15 +127,12 @@ def train(X, contents_Y, styles_Y, device, lr, num_epochs, lr_decay_epoch):
         if (epoch + 1) % 10 == 0:
             animator.axes[1].imshow(postprocess(img))
             animator.add(epoch + 1, [float(sum(contents_l)), float(sum(styles_l)), float(tv_l)])
-            plt.show()
     return img
 
 device, image_shape = common.try_gpu_or_mps(), (300, 450)
 net = net.to(device)
-content_X, contents_Y = get_content(image_shape, device)
-print(content_X.shape, contents_Y.shape)
-_, styles_Y = get_style(image_shape, device)
-print(styles_Y.shape)
+content_X, contents_Y = get_contents(image_shape, device)
+_, styles_Y = get_styles(image_shape, device)
 output = train(content_X, contents_Y, styles_Y, device, 0.3, 500, 50)
 plt.imshow(postprocess(output))
 plt.show()
