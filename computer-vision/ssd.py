@@ -8,10 +8,14 @@ from torch.nn import functional as F
 from d2l import torch as d2l
 
 # 类别预测层
+# 输入输出的高宽一样. 对于输入的每一个像素，计算所有模框 x 所有类别的预测值
+# output channel = num_anchors * (num_classes + 1)
 def cls_predictor(num_inputs, num_anchors, num_classes):
     return nn.Conv2d(num_inputs, num_anchors * (num_classes + 1), kernel_size=3, padding=1)
 
 # 边界框预测层
+# 对于输入的每一个像素，计算所有模框的4位offset
+# output channel = num_anchors * 4
 def bbox_predictor(num_inputs, num_anchors):
     return nn.Conv2d(num_inputs, num_anchors * 4, kernel_size=3, padding=1)
 
@@ -28,7 +32,7 @@ print(Y1.shape, Y2.shape)
 
 def flatten_pred(pred):
     # 将 (batch_size, channel, height, weight) 展平为（batch_size, height * weight * channel)
-    # 通道数放在最后，方便获得单个像素的预测值
+    # 通道数放在最后，方便获得单个像素的预测值（通道数为类别数）
     return torch.flatten(pred.permute(0, 2, 3, 1), start_dim=1)
 
 def concat_preds(preds):
@@ -38,7 +42,7 @@ def concat_preds(preds):
     return torch.cat([flatten_pred(p) for p in preds], dim=1)
 
 # [2, 25300]
-# 25300 = 55 * 20 * 20 + 33 * 10 * 10
+# 25300 = 20 * 20 * 55 + 10 * 10 * 33
 print(concat_preds([Y1, Y2]).shape)
 
 # 高宽减半模块（用来搭建最简单的网络）
@@ -84,13 +88,17 @@ def blk_forward(X, blk, size, ratio, cls_preditor, bbox_preditor):
     Y = blk(X)
     # (1, (height * width) * num_anchor, 4)
     # num_anchor = num_sizes + num_ratios - 1
+    # TODO(rogerluo): anchor只和Y的形状有关系，可以提前计算好
     anchors = common.multibox_prior(Y, sizes=size, ratios=ratio)
     # (batch_size, num_anchors * num_classes, height, width)
+    # cls_preditor需要知道num_anchors，在构造cls_preditor时获得该信息
+    # cls_preditor并不需要每一个anchor的信息，anchors信息会在计算loss的时候被用到
     cls_preds = cls_preditor(Y)
     # (batch_size, num_anchor * 4, height, width)
     bbox_preds = bbox_preditor(Y)
     return (Y, anchors, cls_preds, bbox_preds)
 
+# size 左值通过 0.2 ~ 0.88差值得到；右值 0.272 = sqrt(0.2 * 0.37)
 sizes = [[0.2, 0.272], [0.37, 0.447], [0.54, 0.619], [0.71, 0.79], [0.88, 0.961]]
 ratios = [[1, 2, 0.5]] * 5
 num_anchors = len(sizes[0]) + len(ratios[0]) - 1
@@ -146,7 +154,8 @@ print('output bbox preds:', bbox_preds.shape)
 # 读取数据集和初始化
 batch_size = 32
 train_iter, _ = d2l.load_data_bananas(batch_size)
-device, net = common.try_gpu_or_mps(), TinySSD(num_classes=1)
+# TODO(rogerluo): 使用mps进行训练，会有bug
+device, net = common.try_gpu(), TinySSD(num_classes=1)
 trainer = torch.optim.SGD(net.parameters(), lr=0.2, weight_decay=5e-4)
 
 # 定义损失函数和评价函数
@@ -176,6 +185,7 @@ def bbox_eval(bbox_preds, bbox_labels, bbox_masks):
 num_epochs, timer = 20, d2l.Timer()
 animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs], legend=['class error', 'bbox mae'])
 net = net.to(device)
+print('train on device: ', device)
 for epoch in range(num_epochs):
     metric = d2l.Accumulator(4)
     net.train()

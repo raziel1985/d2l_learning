@@ -16,9 +16,11 @@ print(list(pretrained_net.children())[-3:])
 # 复制了ResNet-18中大部分的预训练层，除了最后的全局平均汇聚层和最接近输出的全连接层
 net = nn.Sequential(*list(pretrained_net.children())[:-2])
 X = torch.rand(size=(1, 3, 320, 480))
+# [1, 512, 10, 15], 320*480缩小32倍为10*15
 print(net(X).shape)
 
 num_classes = 21
+# 输出通道数可以选取大于num_classes的任意值，这里选择了最小的num_classes,减少运算量
 net.add_module('final_conv', nn.Conv2d(512, num_classes, kernel_size=1))
 # 放大32倍（和resnet18前序网络缩小32倍一致），kernel_size是stride的两倍保证移动时有一半的覆盖，padding=16是最后高宽不变的最小值
 net.add_module('transpose_conv', nn.ConvTranspose2d(num_classes, num_classes,
