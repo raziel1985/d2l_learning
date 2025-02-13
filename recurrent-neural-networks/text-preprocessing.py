@@ -84,7 +84,7 @@ def load_corpus_time_machine(max_tokens=-1):
     lines = read_time_machine()
     tokens = tokenize(lines, 'char')
     vocab = Vocab(tokens)
-    corpus = [vocab[tokens] for line in tokens for tokens in line]
+    corpus = [vocab[token] for line in tokens for token in line]
     if max_tokens > 0:
         corpus = corpus[:max_tokens]
     return corpus, vocab
