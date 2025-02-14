@@ -1,3 +1,4 @@
+import os
 import collections
 import math
 import random
@@ -66,7 +67,7 @@ class Vocab:
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self.token_to_idx.get(tokens, self.unk)
+            return self.token_to_idx.get(tokens, self.unk())
         return [self.__getitem__(token) for token in tokens]
 
     def to_tokens(self, indices):
@@ -278,3 +279,107 @@ class RNNModel(nn.Module):
                                  batch_size, self.num_hiddens), device=device),
                     torch.zeros((self.num_directions * self.rnn.num_layers,
                                  batch_size, self.num_hiddens), device=device))
+
+d2l.DATA_HUB['fra-eng'] = (d2l.DATA_URL + 'fra-eng.zip',
+                           '94646ad1522d915e7b0f9296181140edcf86a4f5')
+def read_data_nmt():
+    # 载入‘英语-法语‘数据集
+    data_dir = d2l.download_extract('fra-eng')
+    with open(os.path.join(data_dir, 'fra.txt'), 'r', encoding='utf-8') as f:
+        return f.read()
+
+def preprocess_nmt(text):
+    def no_space(char, prev_char):
+        return char in set(',.!?') and prev_char != ' '
+
+    # 使用空格替换不间断空格
+    # 使用小写字母替换大写字母
+    text = text.replace('\u202f', ' ').replace('\xa0', ' ').lower()
+    # 在单词和标点符号之间插入空格
+    out = [' ' + char if i > 0 and no_space(char, text[i-1]) else char
+           for i, char in enumerate(text)]
+    return ''.join(out)
+
+# 词元化
+def tokenize_nmt(text, num_examples=None):
+    source, target = [], []
+    for i, line in enumerate(text.split('\n')):
+        if num_examples and i > num_examples:
+            break
+        parts = line.split('\t')
+        if len(parts) == 2:
+            source.append(parts[0].split(' '))
+            target.append(parts[1].split(' '))
+    return source, target
+
+# 加载数据集
+def truncate_pad(line, num_steps, padding_token):
+    """截断或填充文本序列"""
+    if len(line) > num_steps:
+        return line[:num_steps] # 截断
+    return line + [padding_token] * (num_steps - len(line)) # 填充
+
+def build_array_mnt(lines, vocab, num_steps):
+    """将机器翻译的文本序列转换成小批量"""
+    lines = [vocab[l] for l in lines]
+    lines = [l + [vocab['<eos>']] for l in lines]
+    array = torch.tensor([truncate_pad(l, num_steps, vocab['<pad>']) for l in lines])
+    valid_len = (array != vocab['<pad>']).type(torch.int32).sum(1)
+    return array, valid_len
+
+def load_data_nmt(batch_size, num_steps, num_examples=600):
+    """返回翻译数据集的迭代器和词表"""
+    text = preprocess_nmt(read_data_nmt())
+    print('text line:', len(text.split('\n')), 'load num examples:', num_examples)
+    print(text.split('\n')[:5])
+    source, target = tokenize_nmt(text, num_examples)
+    print('source line:', len(source), 'source token:', len([token for line in source for token in line]))
+    print(source[:5])
+    print('target line:', len(target), 'target token:', len([token for line in target for token in line]))
+    print(target[:5])
+    src_vocab = Vocab(source, min_freq=2, reserved_tokens=['<pad>', '<bos>', '<eos>'])
+    tgt_vocab = Vocab(target, min_freq=2, reserved_tokens=['<pad>', '<bos>', '<eos>'])
+    print('source vocab:', len(src_vocab), 'target vocab:', len(tgt_vocab))
+    for i in range(0, 10):
+        print('src_vocab idx ', i, ':', src_vocab.idx_to_token[i])
+    for i in range(0, 10):
+        print('tgt_vocab idx ', i, ':', tgt_vocab.idx_to_token[i])
+    # src_array: [[idx_of_words]]. [id_of_words]的长度均剪裁填充到num_steps(包含 <eos>)
+    # src_valid_len: [valid_len]. 表示对应[id_of_words]中，不包含<pad>的有效长度
+    src_array, src_valid_len = build_array_mnt(source, src_vocab, num_steps)
+    tgt_array, tgt_valid_len = build_array_mnt(target, tgt_vocab, num_steps)
+    data_arrays = (src_array, src_valid_len, tgt_array, tgt_valid_len)
+    data_iter = d2l.load_array(data_arrays, batch_size)
+    # data_iter: iter for (batch_size, num_step), (batch_size), (batch_size, num_step), (batch_size)
+    return data_iter, src_vocab, tgt_vocab
+
+# 编码器
+class Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(Encoder, self).__init__(**kwargs)
+
+    def forward(self, X, *args):
+        raise NotImplementedError
+
+# 解码器
+class Decoder(nn.Module):
+    def __init__(self, **kwargs):
+        super(Decoder, self, **kwargs).__init__(**kwargs)
+
+    def init_state(self, enc_outputs, *args):
+        raise NotImplementedError
+
+    def foward(self, X, state):
+        raise NotImplementedError
+
+# 合并编码器和解码器
+class EncoderDecoder(nn.Module):
+    def __init__(self, encoder, decoder, **kwargs):
+        super(EncoderDecoder, self).__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def forward(self, enc_X, dec_X, *args):
+        enc_outputs = self.encoder(enc_X, *args)
+        dec_state = self.decoder.init_state(enc_outputs, *args)
+        return self.decoder(dec_X, dec_state)
