@@ -256,16 +256,18 @@ class DotProductAttention(nn.Module):
           self.dropout = nn.Dropout(dropout)
 
      # queries: (batch_size, num_queries, d)
-     # keys: (batch_size, num_pair, d)
-     # values: (batch_size, num_pair, value_size)
+     # keys: (batch_size, num_keys, d)
+     # values: (batch_size, num_keys, value_dim)
      # valid_lens: (batch_size)
      def forward(self, queries, keys, values, valid_lens=None):
           d = queries.shape[-1]
-          # scores: (batch_size, num_queries, num_pair)
+          # keys.transpose(1, 2) 形状为 (batch_size, d, num_keys)
+          # 经过torch.bmm矩阵乘法后，scores 形状为 (batch_size, num_queries, num_keys)
+          # 除以 math.sqrt(d) 是为了缩放点击结果，防止梯度爆炸或消失
           scores = torch.bmm(queries, keys.transpose(1, 2)) / math.sqrt(d)
-          # attention_weights: (batch_size, num_queries, num_pair)
+          # attention_weights: (batch_size, num_queries, num_keys)
           self.attention_weights = masked_softmax(scores, valid_lens)
-          # output: (batch_size, num_queries, value_size)
+          # output: (batch_size, num_queries, value_dim)
           return torch.bmm(self.dropout(self.attention_weights), values)
 
 class MaskedSoftmaxCELoss(nn.CrossEntropyLoss):
@@ -320,8 +322,8 @@ def train_seq2seq(net, data_iter, lr, num_epochs, tgt_vocab, device):
             # X_valid_len, Y_valid_len: (batch_size)
             X, X_valid_len, Y, Y_valid_len = [x.to(device) for x in batch]
             bos = torch.tensor([tgt_vocab['<bos>']] * Y.shape[0], device=device).reshape(-1, 1)
-            # decoder的input强制加入bos，并去除Y的最后一个元素
-            # TODO(rogerluo): 去除的元素如果是<eos>，对训练有影响吗？
+            # 强制教学：将序列开始词元<bos>和原始输出序列（不包含序列结束词元<eos>)拼接在一起作为解码器的输入
+            # TODO(rogerluo): 当句子被<padding>填充后，最后的一个<padding>，但<eos>会被保留，此时对训练会有影响吗？
             dec_input = torch.cat([bos, Y[:, :-1]], 1)
             # X_valid_len暂时没有被使用到，在attention中会被用到
             Y_hat, _ = net(X, dec_input, X_valid_len)
@@ -390,6 +392,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, num_hiddens, dropout, max_len=1000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
+        # P: (1, max_len, num_hiddens) 1这个维度方便后续做广播操作
         self.P = torch.zeros((1, max_len, num_hiddens))
         # X: (max_len, num_hiddens // 2)
         X = (torch.arange(max_len, dtype=torch.float32).reshape(-1, 1) /

@@ -36,25 +36,28 @@ class MultiHeadAttention(nn.Module):
         self.W_v = nn.Linear(value_size, num_hiddens, bias=bias)
         self.W_o = nn.Linear(num_hiddens, num_hiddens, bias=bias)
 
-    # queries: (batch_size, num_pair, query_size)
-    # keys: (batch_size, num_pair, key_size)
-    # values: (batch_size, num_pair, num_hiddens)
+    # queries: (batch_size, query_seq_len, query_size)
+    # keys: (batch_size, key_seq_len, key_size)
+    # values: (batch_size, value_seq_len, value_size)
     # valid_lens: (batch_size) or (batch_size, num_query)
+    # key_seq_len = value_seq_len
     def forward(self, queries, keys, values, valid_lens):
-        # queries, keys, value: (batch_size * num_head, num_pair, num_hiddens / num_head)
+        # queries: (batch_size * num_head, query_seq_len, num_hiddens / num_head)
         queries = transpose_qkv(self.W_q(queries), self.num_heads)
+        # keys: (batch_size * num_head, key_seq_len, num_hiddens / num_head)
         keys = transpose_qkv(self.W_k(keys), self.num_heads)
+        # value: (batch_size * num_head, value_seq_len, num_hiddens / num_head)
         values = transpose_qkv(self.W_v(values), self.num_heads)
 
         if valid_lens is not None:
             # 在轴0，将每一项复制num_heads次
             valid_lens = torch.repeat_interleave(valid_lens, repeats=self.num_heads, dim=0)
 
-        # output: (batch_num * num_head, num_queries, num_hiddens / num_head)
+        # output: (batch_num * num_head, query_seq_len, num_hiddens / num_head)
         output = self.attention(queries, keys, values, valid_lens)
-        # output_concat: (batch_num, num_queries, num_hiddens)
+        # output_concat: (batch_num, query_seq_len, num_hiddens)
         output_concat = transpose_output(output, self.num_heads)
-        # (batch_name, num_queries, num_hiddens)
+        # (batch_num, query_seq_len, num_hiddens)
         return self.W_o(output_concat)
 
 num_hiddens, num_heads = 100, 5
@@ -185,17 +188,19 @@ class DecoderBlock(nn.Module):
         self.addnorm3 = AddNorm(norm_shape, dropout)
 
     def forward(self, X, state):
-        # X: (batch_num, num_steps, query_size)
-        # enc_outputs: (batch_num, num_steps, num_hiddens)
+        # X: (batch_num, num_dec_steps, query_size)
+        # enc_outputs: (batch_num, num_enc_steps, num_hiddens)
         # enc_valid_lens: (batch_num)
         enc_outputs, enc_valid_lens = state[0], state[1]
         if state[2][self.i] is None:
-            # 训练阶段，输出序列的所有次元都在同一时间处理
+            # 训练阶段，输出序列的所有词元都在同一时间处理
             # state[2][self.i]初始化为None
+            # key_values: (batch_size, num_dec_steps, num_hiddens)
             key_values = X
         else:
             # 预测阶段，输出序列是通过词元一个接着一个解码的，
             # 因此state[2][self.i]包含着直到当前时间步第i个块解码的输出表示
+            # key_values: (batch_size, num_prev_dec_total + 1, num_hiddens)
             key_values = torch.cat((state[2][self.i], X), axis=1)
         state[2][self.i] = key_values
         if self.training:
@@ -206,11 +211,13 @@ class DecoderBlock(nn.Module):
         else:
             dec_valid_lens = None
         # 自注意力
-        # X2: (batch_num, num_steps, num_hiddens)
+        # X2: (batch_num, num_dec_steps, num_hiddens)
+        # 训练模式下，X(即query)包含完整词元，通过设置dec_valid_lens，让第x个step的query只能看到前x个词元的key_values
+        # 预测模式下，X(即query)仅包含最后一个词元，key_values包含解码器累计到当下的所有词元
         X2 = self.attention1(X, key_values, key_values, dec_valid_lens)
         Y = self.addnorm1(X, X2)
         # 编码器-解码器注意力
-        # Y2: (batch_num, num_steps, num_hiddens)
+        # Y2: (batch_num, num_dec_steps, num_hiddens)
         Y2 = self.attention2(Y, enc_outputs, enc_outputs, enc_valid_lens)
         Z = self.addnorm2(Y, Y2)
         return self.addnorm3(Z, self.ffn(Z)), state
